@@ -6,6 +6,10 @@ Everything is simulated. There is no live plant data, no connection to real cont
 
 ![Overview](screenshots/01-overview.jpg)
 
+## Demo video
+
+[Watch the 10-second announcement](geoshield-ics-demo-video.mp4) — AI-generated simulation: the voice and likeness are simulated by AI, made for fun to announce the project. That is not Robert's real voice. The label is also burned into the video itself.
+
 ## What it does
 
 - **Geothermal plant digital twin** — an animated process schematic tracking three production wells, a steam separator, a turbine generator, a condenser, and reinjection wells, with live drifting telemetry (wellhead temperature, steam pressure, turbine speed, net generation).
@@ -55,6 +59,7 @@ Single-file HTML + vanilla JavaScript. Tailwind CSS and Google Fonts (Inter, Jet
 ```
 geoshield-ics/
 ├── index.html          # The entire simulator
+├── geoshield-ics-demo-video.mp4   # 10-second AI-simulated announcement (labeled)
 ├── README.md
 ├── LICENSE
 └── screenshots/        # Captured from the running simulator
