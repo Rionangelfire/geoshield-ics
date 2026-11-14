@@ -6,9 +6,11 @@ Everything is simulated. There is no live plant data, no connection to real cont
 
 ![Overview](screenshots/01-overview.jpg)
 
-## Demo video
+## Demo videos
 
 [Watch the 10-second announcement](geoshield-ics-demo-video.mp4) — AI-generated simulation: the voice and likeness are simulated by AI, made for fun to announce the project. That is not Robert's real voice. The label is also burned into the video itself.
+
+[Watch the full 62-second demo](geoshield-ics-demo-video-polished.mp4) — the announcement followed by captioned footage of the simulator running: telemetry drifting, an attack sequence, a reset, a scored drill, and the MITRE ATT&CK explorer. The opening announcement carries the same AI-simulation label, burned in; the simulator footage is a real recording of this page running.
 
 ## What it does
 
@@ -60,6 +62,7 @@ Single-file HTML + vanilla JavaScript. Tailwind CSS and Google Fonts (Inter, Jet
 geoshield-ics/
 ├── index.html          # The entire simulator
 ├── geoshield-ics-demo-video.mp4   # 10-second AI-simulated announcement (labeled)
+├── geoshield-ics-demo-video-polished.mp4   # 62-second demo: announcement + captioned simulator footage
 ├── README.md
 ├── LICENSE
 └── screenshots/        # Captured from the running simulator
