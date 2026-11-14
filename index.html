@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoShield ICS | Geothermal Power Plant Cybersecurity Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            925: '#0d1422',
+                            950: '#080c14',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom SVG Steam & Flow Animations */
+        @keyframes steamRise {
+            0% { transform: translateY(0) scale(0.95); opacity: 0.0; }
+            25% { opacity: 0.55; }
+            80% { opacity: 0.25; }
+            100% { transform: translateY(-38px) scale(1.25); opacity: 0; }
+        }
+        .steam-plume-1 { animation: steamRise 4.2s infinite ease-out; }
+        .steam-plume-2 { animation: steamRise 4.2s infinite ease-out 1.4s; }
+        .steam-plume-3 { animation: steamRise 4.2s infinite ease-out 2.8s; }
+
+        @keyframes dashFlow {
+            to { stroke-dashoffset: -24; }
+        }
+        .pipe-flow {
+            stroke-dasharray: 6 6;
+            animation: dashFlow 1.2s linear infinite;
+        }
+        .pipe-flow-fast {
+            stroke-dasharray: 8 4;
+            animation: dashFlow 0.45s linear infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 2px rgba(244, 63, 94, 0.4)); }
+            50% { filter: drop-shadow(0 0 10px rgba(244, 63, 94, 0.95)); }
+        }
+        .node-compromised {
+            animation: pulseGlow 1.2s infinite ease-in-out;
+        }
+
+        /* Custom scrollbar for SOC Logs */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.6); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-200 transition-colors duration-200">
+
+    <!-- Top SOC Command Bar -->
+    <header class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2">
+            <!-- Brand Identity -->
+            <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-sm tracking-tight">GeoShield <span class="text-emerald-600 dark:text-emerald-400 font-mono">ICS</span></span>
+                        <span class="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            OT SOC v2.4
+                        </span>
+                    </div>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400 hidden sm:block leading-none">Geothermal Baseload SCADA Defense</p>
+                </div>
+            </div>
+
+            <!-- Global Status & Controls -->
+            <div class="flex items-center space-x-2">
+                <!-- Plant Security Posture Indicator -->
+                <div id="global-posture-pill" class="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[11px] font-mono">
+                    <span id="global-posture-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="global-posture-text">PLANT POSTURE: NOMINAL</span>
+                </div>
+
+                <!-- Launch Training Mode Button -->
+                <button onclick="openTrainingModal()" class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Drill</span>
+                    <span id="score-badge" class="px-1 rounded bg-slate-950/20 font-mono text-[10px]">0 XP</span>
+                </button>
+
+                <!-- Copy README.md -->
+                <button onclick="copyMarkdown()" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer" title="Copy GitHub README.md">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                    <span class="hidden lg:inline">README</span>
+                </button>
+
+                <!-- Theme Toggle -->
+                <button onclick="toggleTheme()" aria-label="Toggle theme" class="p-1.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer">
+                    <svg class="w-3.5 h-3.5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <svg class="w-3.5 h-3.5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Operations & Learning Workspace -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4">
+
+        <!-- 9. Compact Geothermal Power Plant Hero Banner -->
+        <section class="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-900 via-slate-925 to-emerald-950 text-white shadow-sm">
+            <div class="grid grid-cols-1 lg:grid-cols-12 items-center">
+                <!-- Left Copy -->
+                <div class="lg:col-span-7 p-4 sm:p-5 z-10 space-y-2.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Critical Infrastructure Defense
+                        </span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                            NERC CIP &bull; NIST CSF &bull; IEC 62443
+                        </span>
+                    </div>
+                    <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight leading-snug">
+                        GeoShield ICS: <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-300">Geothermal OT Security Simulator</span>
+                    </h1>
+                    <p class="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
+                        Interactive SCADA telemetry, Purdue Model segmentation, MITRE ATT&amp;CK for ICS threat modeling, and role-based incident response drills.
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                        <button id="hero-sim-btn" onclick="startAttackSequence()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span id="hero-sim-btn-text">Launch Live Attack</span>
+                        </button>
+                        <button onclick="resetPlantBaseline()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer">
+                            Reset Baseline
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Animated Geothermal Power Plant SVG Illustration -->
+                <div class="lg:col-span-5 h-40 sm:h-44 lg:h-full relative flex items-end justify-center bg-slate-950/40 border-t lg:border-t-0 lg:border-l border-slate-800/80 p-1.5">
+                    <svg viewBox="0 0 420 190" class="w-full h-full max-h-44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Geothermal Power Plant Schematic Hero">
+                        <defs>
+                            <linearGradient id="magmaGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#f97316" stop-opacity="0.35"/>
+                                <stop offset="100%" stop-color="#dc2626" stop-opacity="0.7"/>
+                            </linearGradient>
+                            <linearGradient id="mountainGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#1e293b"/>
+                                <stop offset="100%" stop-color="#0f172a"/>
+                            </linearGradient>
+                        </defs>
+
+                        <!-- Background Mountains -->
+                        <polygon points="0,128 75,48 155,128" fill="url(#mountainGrad)" stroke="#334155" stroke-width="1"/>
+                        <polygon points="95,128 185,32 280,128" fill="url(#mountainGrad)" stroke="#334155" stroke-width="1"/>
+                        <polygon points="230,128 315,60 420,128" fill="url(#mountainGrad)" stroke="#334155" stroke-width="1"/>
+
+                        <!-- Subsurface Reservoir / Magma Layer -->
+                        <rect x="0" y="128" width="420" height="62" fill="#090d16"/>
+                        <path d="M0 160 Q 105 146, 210 160 T 420 160 L 420 190 L 0 190 Z" fill="url(#magmaGrad)"/>
+                        <text x="14" y="181" fill="#fb923c" font-family="JetBrains Mono, monospace" font-size="8.5" opacity="0.85">GEOTHERMAL RESERVOIR // 265°C</text>
+
+                        <!-- Rising Steam Plumes -->
+                        <circle cx="158" cy="74" r="9" fill="#94a3b8" class="steam-plume-1"/>
+                        <circle cx="166" cy="68" r="12" fill="#cbd5e1" class="steam-plume-2"/>
+                        <circle cx="152" cy="66" r="10" fill="#e2e8f0" class="steam-plume-3"/>
+                        <circle cx="242" cy="78" r="8" fill="#94a3b8" class="steam-plume-2"/>
+                        <circle cx="248" cy="72" r="11" fill="#cbd5e1" class="steam-plume-3"/>
+
+                        <!-- Production & Injection Wells -->
+                        <line x1="95" y1="166" x2="95" y2="108" stroke="#f97316" stroke-width="3.5"/>
+                        <line x1="95" y1="166" x2="95" y2="108" stroke="#fed7aa" stroke-width="1.5" class="pipe-flow"/>
+                        <text x="48" y="146" fill="#fdba74" font-family="JetBrains Mono, monospace" font-size="8">PROD WELL</text>
+
+                        <line x1="295" y1="114" x2="295" y2="166" stroke="#06b6d4" stroke-width="3.5"/>
+                        <line x1="295" y1="114" x2="295" y2="166" stroke="#a5f3fc" stroke-width="1.5" class="pipe-flow"/>
+                        <text x="303" y="146" fill="#67e8f9" font-family="JetBrains Mono, monospace" font-size="8">INJ WELL</text>
+
+                        <!-- Surface Piping & Plant Hall -->
+                        <polyline points="95,108 140,108" stroke="#f97316" stroke-width="2.5"/>
+                        <polyline points="175,102 222,102" stroke="#e2e8f0" stroke-width="2.5" class="pipe-flow"/>
+                        <polyline points="262,114 295,114" stroke="#06b6d4" stroke-width="2.5"/>
+
+                        <rect x="140" y="84" width="35" height="44" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+                        <text x="146" y="109" fill="#6ee7b7" font-family="JetBrains Mono, monospace" font-size="8">SEP</text>
+
+                        <rect x="222" y="88" width="42" height="40" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+                        <text x="228" y="111" fill="#7dd3fc" font-family="JetBrains Mono, monospace" font-size="8">TURB</text>
+
+                        <!-- High-Voltage Transmission Pylon -->
+                        <path d="M355 128 L365 74 L375 128 M352 90 L378 90 M356 105 L374 105" stroke="#94a3b8" stroke-width="1.5"/>
+                        <path d="M264 94 Q 315 104, 352 90" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3 3"/>
+                        <path d="M378 90 Q 400 98, 420 92" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3 3"/>
+                        <text x="336" y="66" fill="#7dd3fc" font-family="JetBrains Mono, monospace" font-size="8">138kV GRID</text>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Threat Scenario Selector Bar -->
+        <section aria-labelledby="threat-vectors-heading" class="space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="threat-vectors-heading" class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>1. Attack Vector Scenario</span>
+                    <span class="text-[10px] font-mono font-normal px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300">5 ICS Profiles</span>
+                </h2>
+                <div class="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                    Active: <strong id="selected-badge" class="text-emerald-600 dark:text-emerald-400">Sensor &amp; Control Data Manipulation</strong>
+                </div>
+            </div>
+
+            <!-- 5 Compact Threat Cards -->
+            <div id="vector-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+        <!-- CORE OT OPERATIONS GRID: Digital Twin + Live Telemetry + SOC Detection Engine -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+            <!-- 4. Geothermal Digital Twin (Left 7 Cols) -->
+            <div class="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] font-mono uppercase tracking-wider text-cyan-600 dark:text-cyan-400 font-semibold">Live Process Schematic</span>
+                        <h3 class="text-base font-bold text-slate-900 dark:text-white leading-tight">Geothermal Plant Digital Twin</h3>
+                    </div>
+                    <div class="flex items-center space-x-2.5 text-[11px] font-mono">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Normal</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Warn</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span>Breach</span>
+                    </div>
+                </div>
+
+                <!-- Interactive SVG Digital Twin -->
+                <div class="w-full bg-slate-950 rounded-lg border border-slate-800 p-2.5 overflow-x-auto">
+                    <svg id="digital-twin-svg" viewBox="0 0 640 245" class="w-full min-w-[520px] h-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Connecting Process Pipes -->
+                        <path d="M115 40 L195 40 L195 104 L230 104" stroke="#475569" stroke-width="3"/>
+                        <path d="M115 40 L195 40 L195 104 L230 104" stroke="#38bdf8" stroke-width="1.5" class="pipe-flow"/>
+
+                        <path d="M115 118 L230 118" stroke="#475569" stroke-width="3"/>
+                        <path d="M115 118 L230 118" stroke="#38bdf8" stroke-width="1.5" class="pipe-flow"/>
+
+                        <path d="M115 196 L195 196 L195 132 L230 132" stroke="#475569" stroke-width="3"/>
+                        <path d="M115 196 L195 196 L195 132 L230 132" stroke="#38bdf8" stroke-width="1.5" class="pipe-flow"/>
+
+                        <!-- Separator to Turbine -->
+                        <path d="M325 118 L380 118" stroke="#475569" stroke-width="4"/>
+                        <path id="pipe-sep-turb" d="M325 118 L380 118" stroke="#10b981" stroke-width="2" class="pipe-flow"/>
+
+                        <!-- Turbine to Condenser -->
+                        <path d="M475 118 L520 118" stroke="#475569" stroke-width="3"/>
+                        <path d="M475 118 L520 118" stroke="#38bdf8" stroke-width="1.5" class="pipe-flow"/>
+
+                        <!-- Condenser to Injection Wells -->
+                        <path d="M570 152 L570 202 L520 202" stroke="#475569" stroke-width="3"/>
+                        <path d="M570 152 L570 202 L520 202" stroke="#06b6d4" stroke-width="1.5" class="pipe-flow"/>
+
+                        <!-- Brine Return from Separator to Injection -->
+                        <path d="M277 152 L277 202 L410 202" stroke="#475569" stroke-width="2" stroke-dasharray="4 4"/>
+
+                        <!-- NODE: Well A -->
+                        <g id="twin-wellA" class="transition-all">
+                            <rect x="15" y="16" width="100" height="48" rx="7" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+                            <circle cx="28" cy="30" r="3.5" fill="#10b981"/>
+                            <text x="38" y="33" fill="#f8fafc" font-family="Inter, sans-serif" font-size="10.5" font-weight="700">Well A</text>
+                            <text id="twin-wellA-val" x="24" y="51" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">184.2°C | 14.8b</text>
+                        </g>
+
+                        <!-- NODE: Well B -->
+                        <g id="twin-wellB" class="transition-all">
+                            <rect x="15" y="94" width="100" height="48" rx="7" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+                            <circle cx="28" cy="108" r="3.5" fill="#10b981"/>
+                            <text x="38" y="111" fill="#f8fafc" font-family="Inter, sans-serif" font-size="10.5" font-weight="700">Well B</text>
+                            <text id="twin-wellB-val" x="24" y="129" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">181.6°C | 14.5b</text>
+                        </g>
+
+                        <!-- NODE: Well C -->
+                        <g id="twin-wellC" class="transition-all">
+                            <rect x="15" y="172" width="100" height="48" rx="7" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+                            <circle cx="28" cy="186" r="3.5" fill="#10b981"/>
+                            <text x="38" y="189" fill="#f8fafc" font-family="Inter, sans-serif" font-size="10.5" font-weight="700">Well C</text>
+                            <text id="twin-wellC-val" x="24" y="207" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">186.0°C | 15.1b</text>
+                        </g>
+
+                        <!-- NODE: Steam Separator -->
+                        <g id="twin-separator" class="transition-all">
+                            <rect x="230" y="84" width="95" height="68" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+                            <circle cx="243" cy="99" r="3.5" fill="#10b981"/>
+                            <text x="252" y="102" fill="#f8fafc" font-family="Inter, sans-serif" font-size="10.5" font-weight="700">Separator</text>
+                            <text id="twin-sep-status" x="241" y="122" fill="#34d399" font-family="JetBrains Mono, monospace" font-size="9">FLASH: 98.4%</text>
+                            <text x="241" y="138" fill="#64748b" font-family="JetBrains Mono, monospace" font-size="8.5">PLC-01 // RTU</text>
+                        </g>
+
+                        <!-- NODE: Turbine Generator -->
+                        <g id="twin-turbine" class="transition-all">
+                            <rect x="380" y="84" width="95" height="68" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+                            <circle cx="393" cy="99" r="3.5" fill="#10b981"/>
+                            <text x="403" y="102" fill="#f8fafc" font-family="Inter, sans-serif" font-size="10.5" font-weight="700">Turbine</text>
+                            <text id="twin-turb-status" x="391" y="122" fill="#34d399" font-family="JetBrains Mono, monospace" font-size="9">3,600 RPM</text>
+                            <text id="twin-turb-mw" x="391" y="138" fill="#38bdf8" font-family="JetBrains Mono, monospace" font-size="8.5">OUTPUT: 48.2 MW</text>
+                        </g>
+
+                        <!-- NODE: Condenser -->
+                        <g id="twin-condenser" class="transition-all">
+                            <rect x="520" y="84" width="102" height="68" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+                            <circle cx="533" cy="99" r="3.5" fill="#10b981"/>
+                            <text x="542" y="102" fill="#f8fafc" font-family="Inter, sans-serif" font-size="10.5" font-weight="700">Condenser</text>
+                            <text id="twin-cond-status" x="531" y="122" fill="#34d399" font-family="JetBrains Mono, monospace" font-size="9">VAC: -0.92 bar</text>
+                            <text x="531" y="138" fill="#64748b" font-family="JetBrains Mono, monospace" font-size="8.5">COOLING LOOP</text>
+                        </g>
+
+                        <!-- NODE: Injection Wells -->
+                        <g id="twin-injection" class="transition-all">
+                            <rect x="410" y="178" width="110" height="48" rx="7" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+                            <circle cx="423" cy="192" r="3.5" fill="#10b981"/>
+                            <text x="433" y="195" fill="#f8fafc" font-family="Inter, sans-serif" font-size="10" font-weight="700">Injection Wells</text>
+                            <text id="twin-inj-status" x="421" y="213" fill="#38bdf8" font-family="JetBrains Mono, monospace" font-size="9">FLOW: 412 kg/s</text>
+                        </g>
+                    </svg>
+                </div>
+
+                <!-- 5. Realistic Drifting Operational Metrics Strip -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800">
+                        <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 block">WELLHEAD TEMP</span>
+                        <span id="metric-temp" class="text-sm sm:text-base font-mono font-bold text-cyan-600 dark:text-cyan-400">184.2 °C</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800">
+                        <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 block">STEAM PRESSURE</span>
+                        <span id="metric-pressure" class="text-sm sm:text-base font-mono font-bold text-cyan-600 dark:text-cyan-400">14.8 bar</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800">
+                        <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 block">TURBINE SPEED</span>
+                        <span id="metric-rpm" class="text-sm sm:text-base font-mono font-bold text-emerald-600 dark:text-emerald-400">3,600 RPM</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800">
+                        <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 block">NET GENERATION</span>
+                        <span id="metric-mw" class="text-sm sm:text-base font-mono font-bold text-emerald-600 dark:text-emerald-400">48.2 MW</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right 5 Cols: 3. Live Attack Timeline + 6. SOC Detection Engine -->
+            <div class="lg:col-span-5 flex flex-col gap-4">
+
+                <!-- 3. Live Animated Attack Kill-Chain Timeline -->
+                <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex-1 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2.5">
+                            <div>
+                                <span class="text-[10px] font-mono uppercase tracking-wider text-rose-500 font-semibold">Incident Progression</span>
+                                <h3 class="text-base font-bold text-slate-900 dark:text-white leading-tight">Live Attack Kill-Chain</h3>
+                            </div>
+                            <button id="timeline-trigger-btn" onclick="startAttackSequence()" class="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border border-rose-500/30 transition-colors cursor-pointer">
+                                &#9654; Run Attack
+                            </button>
+                        </div>
+
+                        <div id="attack-timeline-list" class="space-y-1.5">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. Simulated OT SOC Detection Engine -->
+                <div class="bg-slate-950 text-slate-100 rounded-xl border border-slate-800 p-3.5 shadow-sm font-mono text-[11px] flex flex-col h-44">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span class="font-semibold text-slate-200">OT_IDS // DETECTION ENGINE</span>
+                        </div>
+                        <button onclick="clearSocLogs()" class="text-[10px] text-slate-400 hover:text-white cursor-pointer">Clear</button>
+                    </div>
+                    <div id="soc-log-feed" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                        <!-- Streaming detection alerts -->
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ARCHITECTURE & GOVERNANCE GRID: Purdue Model + NIST/IEC/MITRE Matrix + Risk Heat Map -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+            <!-- 1. Purdue Model Visualization (4 Cols) -->
+            <div class="lg:col-span-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-3">
+                <div>
+                    <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">ICS Segmentation</span>
+                    <h3 class="text-base font-bold text-slate-900 dark:text-white leading-tight">Purdue Model Attack Path</h3>
+                </div>
+
+                <div id="purdue-stack" class="space-y-1.5 relative">
+                    <!-- Populated dynamically for Levels 5 down to 0 -->
+                </div>
+            </div>
+
+            <!-- 2. NIST CSF / IEC 62443 & 7. Clickable MITRE ATT&CK for ICS Explorer (5 Cols) -->
+            <div class="lg:col-span-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-3.5 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div>
+                        <span class="text-[10px] font-mono uppercase tracking-wider text-cyan-600 dark:text-cyan-400 font-semibold">Governance &amp; Threat Intel</span>
+                        <h3 class="text-base font-bold text-slate-900 dark:text-white leading-tight">Framework Mapping &amp; ATT&amp;CK Matrix</h3>
+                    </div>
+
+                    <!-- NIST CSF & IEC 62443 Mapping -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800">
+                            <div class="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200 mb-1.5">NIST CSF 2.0</div>
+                            <ul id="nist-mapping-list" class="space-y-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                                <!-- Dynamic -->
+                            </ul>
+                        </div>
+                        <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800">
+                            <div class="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200 mb-1.5">IEC 62443</div>
+                            <ul id="iec-mapping-list" class="space-y-1 text-[11px] font-mono text-cyan-600 dark:text-cyan-400">
+                                <!-- Dynamic -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 7. Clickable MITRE ATT&CK for ICS Explorer Card -->
+                    <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-mono uppercase text-amber-600 dark:text-amber-400 font-bold">MITRE ATT&amp;CK for ICS</span>
+                            <button onclick="openMitreModal()" class="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition-colors cursor-pointer">
+                                Inspect Details &#8599;
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-slate-400 block font-mono text-[9px]">TECHNIQUE</span>
+                                <span id="mitre-card-tech" class="font-semibold text-slate-800 dark:text-slate-100 text-[11px]">T0831: Manipulation of Control</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 block font-mono text-[9px]">TACTIC</span>
+                                <span id="mitre-card-tactic" class="font-semibold text-slate-800 dark:text-slate-100 text-[11px]">Impair Process Control</span>
+                            </div>
+                        </div>
+                        <p id="mitre-card-summary" class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                            Adversaries manipulate physical process control parameters via unauthorized Modbus/DNP3 commands.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Quick Action to open Training Drill for current scenario -->
+                <button onclick="openTrainingModal()" class="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white text-xs font-semibold transition-colors flex items-center justify-center space-x-1.5 cursor-pointer">
+                    <span>Launch Incident Response Drill</span>
+                    <span>&rarr;</span>
+                </button>
+            </div>
+
+            <!-- 8. Dynamic Threat Severity Heat Map (3 Cols) -->
+            <div class="lg:col-span-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between space-y-3">
+                <div>
+                    <span class="text-[10px] font-mono uppercase tracking-wider text-rose-500 font-semibold">Risk Matrix</span>
+                    <h3 class="text-base font-bold text-slate-900 dark:text-white leading-tight">Severity Heat Map</h3>
+                </div>
+
+                <!-- 3x3 Risk Matrix Grid -->
+                <div class="space-y-1 font-mono text-[9px]">
+                    <div class="grid grid-cols-4 gap-1 items-center text-center">
+                        <div class="text-right pr-1 text-slate-400 font-bold">HIGH</div>
+                        <div id="cell-high-low" class="h-14 rounded-md bg-amber-500/20 border border-amber-500/30 flex flex-col items-center justify-center p-0.5"></div>
+                        <div id="cell-high-med" class="h-14 rounded-md bg-rose-500/25 border border-rose-500/40 flex flex-col items-center justify-center p-0.5"></div>
+                        <div id="cell-high-high" class="h-14 rounded-md bg-rose-600/35 border border-rose-500/60 flex flex-col items-center justify-center p-0.5"></div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1 items-center text-center">
+                        <div class="text-right pr-1 text-slate-400 font-bold">MED</div>
+                        <div id="cell-med-low" class="h-14 rounded-md bg-emerald-500/20 border border-emerald-500/30 flex flex-col items-center justify-center p-0.5"></div>
+                        <div id="cell-med-med" class="h-14 rounded-md bg-amber-500/25 border border-amber-500/40 flex flex-col items-center justify-center p-0.5"></div>
+                        <div id="cell-med-high" class="h-14 rounded-md bg-rose-500/25 border border-rose-500/40 flex flex-col items-center justify-center p-0.5"></div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1 items-center text-center">
+                        <div class="text-right pr-1 text-slate-400 font-bold">LOW</div>
+                        <div id="cell-low-low" class="h-14 rounded-md bg-emerald-500/15 border border-emerald-500/25 flex flex-col items-center justify-center p-0.5"></div>
+                        <div id="cell-low-med" class="h-14 rounded-md bg-emerald-500/20 border border-emerald-500/30 flex flex-col items-center justify-center p-0.5"></div>
+                        <div id="cell-low-high" class="h-14 rounded-md bg-amber-500/20 border border-amber-500/30 flex flex-col items-center justify-center p-0.5"></div>
+                    </div>
+                    <!-- X-Axis Labels -->
+                    <div class="grid grid-cols-4 gap-1 text-center text-slate-400 pt-0.5 font-bold">
+                        <div></div>
+                        <div>LOW</div>
+                        <div>MED</div>
+                        <div>HIGH</div>
+                    </div>
+                </div>
+
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-2">
+                    Impact (Y) vs. Likelihood (X)
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- 7. MITRE ATT&CK for ICS Explorer Modal -->
+    <div id="mitre-modal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5">
+            <div class="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+                <div>
+                    <span class="text-xs font-mono uppercase text-amber-500 font-bold">MITRE ATT&amp;CK&reg; for ICS Explorer</span>
+                    <h3 id="modal-mitre-title" class="text-xl font-bold text-slate-900 dark:text-white mt-0.5">T0831: Manipulation of Control</h3>
+                </div>
+                <button onclick="closeMitreModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white bg-slate-100 dark:bg-slate-800 cursor-pointer">
+                    &#10005;
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800">
+                    <span class="font-mono text-[11px] uppercase text-slate-400 block mb-1">Tactic</span>
+                    <strong id="modal-mitre-tactic" class="text-slate-900 dark:text-white">Impair Process Control</strong>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800">
+                    <span class="font-mono text-[11px] uppercase text-slate-400 block mb-1">Physical Impact</span>
+                    <strong id="modal-mitre-impact" class="text-rose-600 dark:text-rose-400">Equipment Damage &amp; Grid Trip</strong>
+                </div>
+            </div>
+
+            <div class="space-y-3 text-xs sm:text-sm">
+                <div>
+                    <h4 class="font-mono text-xs uppercase text-emerald-600 dark:text-emerald-400 font-bold mb-1">Recommended Mitigations</h4>
+                    <p id="modal-mitre-mitigations" class="text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-850 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800"></p>
+                </div>
+                <div>
+                    <h4 class="font-mono text-xs uppercase text-cyan-600 dark:text-cyan-400 font-bold mb-1">SOC Detection Strategy</h4>
+                    <p id="modal-mitre-detections" class="text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-850 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800"></p>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="closeMitreModal()" class="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 cursor-pointer">
+                    Close Explorer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 10. Interactive Training Mode Modal (Analyst / Operator / Incident Commander) -->
+    <div id="training-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5">
+            <!-- Header -->
+            <div class="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+                <div>
+                    <span class="text-xs font-mono uppercase text-amber-500 font-bold">GeoShield ICS // Tabletop Simulator</span>
+                    <h3 class="text-xl font-bold text-slate-900 dark:text-white mt-0.5">OT Incident Response Training Drill</h3>
+                </div>
+                <button onclick="closeTrainingModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white bg-slate-100 dark:bg-slate-800 cursor-pointer">
+                    &#10005;
+                </button>
+            </div>
+
+            <!-- Role Selector Tabs -->
+            <div>
+                <span class="text-[11px] font-mono uppercase text-slate-400 block mb-2">Select Operational Role Perspective:</span>
+                <div class="grid grid-cols-3 gap-2">
+                    <button id="role-btn-analyst" onclick="selectTrainingRole('analyst')" class="py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer">
+                        SOC Analyst Mode
+                    </button>
+                    <button id="role-btn-operator" onclick="selectTrainingRole('operator')" class="py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer">
+                        Control Operator Mode
+                    </button>
+                    <button id="role-btn-commander" onclick="selectTrainingRole('commander')" class="py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer">
+                        Incident Commander
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Alert Scenario Box -->
+            <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-mono font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                        ACTIVE OT ALERT
+                    </span>
+                    <span id="drill-role-tag" class="text-[11px] font-mono text-slate-500 dark:text-slate-400">Perspective: SOC Analyst</span>
+                </div>
+                <p id="drill-prompt" class="text-sm font-medium text-slate-900 dark:text-white leading-relaxed">
+                    Pressure telemetry mismatch detected between Wellhead A physical gauge (14.8 bar) and PLC-01 Modbus register (29.4 bar). What is your immediate action?
+                </p>
+            </div>
+
+            <!-- Multiple Choice Options -->
+            <div id="drill-options" class="space-y-2.5">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Feedback Banner -->
+            <div id="drill-feedback" class="hidden p-4 rounded-xl text-xs sm:text-sm leading-relaxed border">
+                <!-- Populated on answer -->
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+                <div class="text-xs font-mono text-slate-500 dark:text-slate-400">
+                    Readiness Score: <strong id="modal-score-display" class="text-emerald-600 dark:text-emerald-400">0 XP</strong>
+                </div>
+                <button onclick="closeTrainingModal()" class="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 cursor-pointer">
+                    Return to Operations Center
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 dark:bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium flex items-center space-x-2 z-50">
+        <svg class="w-4 h-4 text-emerald-400 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <span id="toast-msg">Copied GeoShield ICS README.md to clipboard!</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-200 dark:border-slate-800 py-3.5 text-center text-[11px] text-slate-500 dark:text-slate-400">
+        <p>GeoShield ICS &bull; Geothermal Critical Infrastructure Cybersecurity Simulator &bull; Single-File HTML5</p>
+    </footer>
+
+    <script>
+        // =========================================================================
+        // 1. MASTER DATASET: THREAT VECTORS, PURDUE PATHS, COMPLIANCE, DRILLS
+        // =========================================================================
+        const threatScenarios = [
+            {
+                id: 'sensor-manipulation',
+                shortName: 'Sensor Spoofing',
+                title: 'Sensor & Control Data Manipulation',
+                severity: 'Critical Safety Impact',
+                likelihood: 'med', // low, med, high
+                impact: 'high',    // low, med, high
+                purduePath: [2, 1, 0], // SCADA -> PLC -> Sensors
+                affectedNodes: ['twin-wellA', 'twin-separator', 'twin-turbine'],
+                nist: ['Detect (DE.CM-01)', 'Protect (PR.DS-02)', 'Respond (RS.MI-01)'],
+                iec: ['SR 3.1: Comm Integrity', 'SR 3.5: Input Validation', 'SR 7.1: DoS Protection'],
+                mitre: {
+                    id: 'T0831',
+                    name: 'T0831: Manipulation of Control',
+                    tactic: 'Impair Process Control',
+                    impact: 'Over-pressurization of steam separator & turbine overspeed trip',
+                    summary: 'Adversaries spoof downhole temperature and wellhead pressure telemetry over unauthenticated Modbus/TCP to trigger unsafe actuator states.',
+                    mitigations: 'Deploy cryptographic message authentication (DNP3-SA), physics-based state estimation checks, and independent analog Safety Instrumented Systems (SIS).',
+                    detections: 'Monitor for out-of-band Modbus Function Code 06/16 writes and compare PLC register values against redundant analog sensor loops.'
+                },
+                timeline: [
+                    { time: '14:02', event: 'Rogue ARP Spoofing on OT VLAN 20', detail: 'Man-in-the-middle established between RTU-04 and SCADA HMI.' },
+                    { time: '14:04', event: 'Modbus Packet Injection (FC 16)', detail: 'Wellhead A pressure register spoofed from 14.8 bar to 29.4 bar.' },
+                    { time: '14:05', event: 'Separator Bypass Valve Override', detail: 'Automated PLC loop opens high-pressure steam intake.' },
+                    { time: '14:06', event: 'Turbine Overspeed Warning (4,120 RPM)', detail: 'Physics-based anomaly engine flags telemetry divergence.' },
+                    { time: '14:07', event: 'SOC Alert Triggered: [CRITICAL]', detail: 'Wellhead sensor spoofing detected; SIS trip armed.' }
+                ],
+                drills: {
+                    analyst: {
+                        prompt: 'ALERT: Pressure telemetry mismatch detected between Wellhead A analog gauge (14.8 bar) and PLC-01 Modbus register (29.4 bar). As SOC Analyst, what is your best immediate response?',
+                        options: [
+                            { text: 'A. Ignore the alert as routine sensor calibration drift.', correct: false, feedback: 'Incorrect. A 100% jump in pressure telemetry without corresponding temperature rise indicates active Modbus spoofing or sensor failure.' },
+                            { text: 'B. Isolate RTU-04 network segment & alert Control Operator to verify local analog gauges.', correct: true, feedback: 'Spot on! Containing the compromised OT network path while instructing the operator to rely on out-of-band analog instrumentation prevents unsafe physical actuation.' },
+                            { text: 'C. Immediately issue a remote power-cycle command to the main turbine.', correct: false, feedback: 'Too risky! Uncoordinated remote shutdowns of a 48 MW baseload turbine can cause severe thermal shock and grid instability.' },
+                            { text: 'D. Reboot the central SCADA historian server.', correct: false, feedback: 'Incorrect. Rebooting the historian destroys volatile forensic evidence while leaving the active PLC spoofing uninterrupted.' }
+                        ]
+                    },
+                    operator: {
+                        prompt: 'OPERATOR ALERT: HMI displays 248.9°C brine temperature and 4,120 RPM turbine speed, but local hardwired annunciator panel shows normal temperature. What do you do?',
+                        options: [
+                            { text: 'A. Trust the HMI and emergency-dump all geothermal brine to the surface.', correct: false, feedback: 'Unsafe! Dumping geothermal brine creates environmental hazards and thermal shock.' },
+                            { text: 'B. Switch PLC-01 to Local Manual Control and verify hardwired analog gauges.', correct: true, feedback: 'Correct! In OT operations, local hardwired instrumentation and physical SIS loops are the source of truth when HMI telemetry is suspect.' },
+                            { text: 'C. Silence the alarm and wait 30 minutes for the next shift.', correct: false, feedback: 'Never silence unverified critical process alarms.' },
+                            { text: 'D. Close all injection wells immediately.', correct: false, feedback: 'Closing injection wells while production wells are open causes dangerous back-pressure buildup.' }
+                        ]
+                    },
+                    commander: {
+                        prompt: 'INCIDENT COMMANDER: Confirmed active Modbus spoofing on Wellhead A PLC. Plant is generating 48.2 MW for the regional grid. How do you coordinate response?',
+                        options: [
+                            { text: 'A. Keep plant in safe manual islanded operation, notify grid operator, and authorize OT forensic capture.', correct: true, feedback: 'Excellent leadership! Maintaining grid stability via manual control while preserving forensic packet captures balances safety, reliability, and security.' },
+                            { text: 'B. Disconnect the entire power plant from the 138kV transmission grid immediately.', correct: false, feedback: 'Premature grid disconnection causes unnecessary regional blackout risk when local manual control is viable.' },
+                            { text: 'C. Wipe and reflash all PLCs immediately during peak load.', correct: false, feedback: 'Reflashing PLCs mid-operation trips the plant offline and erases incident root-cause artifacts.' },
+                            { text: 'D. Post incident details publicly before containment.', correct: false, feedback: 'Violates incident communication protocols and tips off the adversary.' }
+                        ]
+                    }
+                }
+            },
+            {
+                id: 'remote-access',
+                shortName: 'VPN Breach',
+                title: 'Compromised Remote Access',
+                severity: 'High Exposure',
+                likelihood: 'high',
+                impact: 'high',
+                purduePath: [5, 4, 3, 2], // Enterprise -> Business -> DMZ -> SCADA
+                affectedNodes: ['twin-separator', 'twin-condenser'],
+                nist: ['Identify (ID.AM-03)', 'Protect (PR.AA-01)', 'Detect (DE.AE-02)'],
+                iec: ['SR 1.1: Human User Auth', 'SR 1.13: Access via Untrusted Nets', 'SR 2.1: Authorization Enforcement'],
+                mitre: {
+                    id: 'T0822',
+                    name: 'T0822: External Remote Services',
+                    tactic: 'Initial Access',
+                    impact: 'Unauthorized adversary foothold inside Operations DMZ and SCADA HMI',
+                    summary: 'Remote geothermal fields rely on vendor maintenance VPNs. Compromised credentials allow attackers to pivot from Level 4 into Level 2 SCADA.',
+                    mitigations: 'Enforce phishing-resistant MFA on OT jump hosts, deploy unidirectional data diodes, and require explicit operator approval for remote sessions.',
+                    detections: 'Alert on off-hours VPN logins, impossible travel anomalies, and RDP/SSH lateral movement from Level 3 DMZ into Level 2.'
+                },
+                timeline: [
+                    { time: '14:03', event: 'VPN Login via Stolen Vendor Credentials', detail: 'External connection authenticated to Level 4 corporate gateway.' },
+                    { time: '14:05', event: 'Suspicious Session on Level 3 Jump Server', detail: 'Port scanning detected targeting SCADA HMI subnet.' },
+                    { time: '14:08', event: 'Unauthorized HMI Session Shadowing', detail: 'Adversary views turbine governor setpoints on Level 2.' },
+                    { time: '14:09', event: 'Cooling Loop Setpoint Altered', detail: 'Condenser vacuum pump throttled down by 25%.' },
+                    { time: '14:10', event: 'SOC Alert Triggered: [CRITICAL]', detail: 'Anomalous OT jump host lateral traversal blocked.' }
+                ],
+                drills: {
+                    analyst: {
+                        prompt: 'ALERT: Vendor maintenance VPN account logged in at 02:15 AM local time and initiated an RDP session to the Level 3 Operations Jump Host. What is your first step?',
+                        options: [
+                            { text: 'A. Revoke the active VPN session token, disable the vendor account, and inspect jump host logs.', correct: true, feedback: 'Correct! Terminating the active remote session immediately severs adversary access before they reach Level 2 PLCs.' },
+                            { text: 'B. Email the vendor asking if they are working late.', correct: false, feedback: 'Too slow—an attacker can pivot to SCADA within minutes while you wait for an email reply.' },
+                            { text: 'C. Shut down the geothermal production wells.', correct: false, feedback: 'Unnecessary physical disruption when the breach is still contained at the Level 3 DMZ.' },
+                            { text: 'D. Delete the vendor account permanently without capturing session logs.', correct: false, feedback: 'Always revoke session tokens and preserve logs first to determine what commands were executed.' }
+                        ]
+                    },
+                    operator: {
+                        prompt: 'OPERATOR ALERT: Your SCADA cursor moves unexpectedly and condenser cooling pump speed drops by 25% without your input. What do you do?',
+                        options: [
+                            { text: 'A. Engage the physical IT/OT DMZ network disconnect switch and restore cooling pump setpoint.', correct: true, feedback: 'Spot on! Severing the upstream DMZ link stops remote manipulation immediately while restoring safe condenser vacuum.' },
+                            { text: 'B. Log out of Windows and leave the console unattended.', correct: false, feedback: 'Logging out leaves the remote session active without restoring the cooling loop.' },
+                            { text: 'C. Increase brine flow from Well C to compensate.', correct: false, feedback: 'Increasing heat input while condenser cooling is degraded will overheat the turbine exhaust.' },
+                            { text: 'D. Unplug the local analog gauges.', correct: false, feedback: 'Analog gauges are your safety lifeline—never disconnect them.' }
+                        ]
+                    },
+                    commander: {
+                        prompt: 'INCIDENT COMMANDER: A third-party turbine vendor VPN was compromised. No PLC logic was modified, but Level 3 DMZ was accessed. What is your directive?',
+                        options: [
+                            { text: 'A. Suspend all third-party remote access, rotate jump server credentials, and audit Level 2 integrity.', correct: true, feedback: 'Textbook containment and eradication procedure for vendor-pivot incidents.' },
+                            { text: 'B. Keep vendor VPN open so they can help troubleshoot the breach.', correct: false, feedback: 'Never allow compromised vendor infrastructure to remain connected during an active incident.' },
+                            { text: 'C. Pay a ransom demand immediately.', correct: false, feedback: 'No ransomware is present, and paying ransoms is against policy.' },
+                            { text: 'D. Ignore the breach since no power outage occurred.', correct: false, feedback: 'Adversaries frequently establish persistence for future destructive attacks.' }
+                        ]
+                    }
+                }
+            },
+            {
+                id: 'insider-threats',
+                shortName: 'Insider Threat',
+                title: 'Insider Threats & Engineering Misuse',
+                severity: 'High Privilege Risk',
+                likelihood: 'low',
+                impact: 'high',
+                purduePath: [2, 1], // Engineering Workstation -> PLC
+                affectedNodes: ['twin-wellB', 'twin-injection'],
+                nist: ['Protect (PR.AA-05)', 'Protect (PR.PS-01)', 'Detect (DE.CM-03)'],
+                iec: ['SR 2.1: Least Privilege', 'SR 2.8: Auditable Events', 'SR 7.6: Network & Security Config'],
+                mitre: {
+                    id: 'T0859',
+                    name: 'T0859: Valid Accounts (Engineering)',
+                    tactic: 'Persistence & Privilege Escalation',
+                    impact: 'Unauthorized PLC ladder logic modification & alarm suppression',
+                    summary: 'Malicious or negligent personnel with authorized physical access to Level 2 engineering workstations alter PLC ladder logic or disable safety alarms.',
+                    mitigations: 'Enforce two-person integrity rules for PLC logic downloads, physical USB port locks, and hardware key-switches set to RUN mode.',
+                    detections: 'Alert on PLC key-switch state changes (RUN to PROGRAM) and unauthorized engineering workstation project downloads.'
+                },
+                timeline: [
+                    { time: '14:01', event: 'USB Mass Storage Inserted on EWS-02', detail: 'Unapproved removable media mounted on Level 2 workstation.' },
+                    { time: '14:03', event: 'PLC-02 Key-Switch Moved to REMOTE', detail: 'Reinjection pump controller placed in programmable state.' },
+                    { time: '14:06', event: 'Modified Ladder Logic Uploaded', detail: 'High-pressure alarm thresholds masked on Injection Well.' },
+                    { time: '14:08', event: 'Reinjection Flow Throttled', detail: 'Subsurface reservoir pressure begins climbing.' },
+                    { time: '14:09', event: 'SOC Alert Triggered: [WARNING]', detail: 'Unauthorized PLC firmware/logic checksum change detected.' }
+                ],
+                drills: {
+                    analyst: {
+                        prompt: 'ALERT: Engineering Workstation EWS-02 uploaded modified ladder logic to Reinjection PLC-02 outside of any scheduled maintenance window. What is your action?',
+                        options: [
+                            { text: 'A. Quarantine EWS-02, pull the last known-good PLC configuration hash, and alert plant engineering.', correct: true, feedback: 'Correct! Comparing the running PLC logic hash against the golden baseline confirms unauthorized tampering.' },
+                            { text: 'B. Whitelist the new PLC checksum automatically.', correct: false, feedback: 'Whitelisting unapproved logic changes masks malicious tampering.' },
+                            { text: 'C. Format EWS-02 hard drive immediately.', correct: false, feedback: 'Formatting destroys forensic evidence of who logged in and what USB device was used.' },
+                            { text: 'D. Disable all SOC alerts from EWS-02.', correct: false, feedback: 'Disabling alerts blinds the SOC during an active insider incident.' }
+                        ]
+                    },
+                    operator: {
+                        prompt: 'OPERATOR ALERT: Reinjection flow drops from 412 kg/s to 190 kg/s, yet no alarm appeared on the HMI. What should you suspect and do?',
+                        options: [
+                            { text: 'A. Suspect alarm suppression/logic tampering; manually open reinjection bypass and verify PLC key-switch.', correct: true, feedback: 'Great catch! Recognizing silent process degradation as potential alarm masking is a core OT operator skill.' },
+                            { text: 'B. Assume the flow meter is broken and ignore it.', correct: false, feedback: 'Unchecked reinjection drops can cause surface brine overflow.' },
+                            { text: 'C. Shut down the cooling tower fans.', correct: false, feedback: 'Cooling fans do not control reinjection pump flow.' },
+                            { text: 'D. Restart the HMI display monitor.', correct: false, feedback: 'Restarting the monitor does not fix altered PLC logic.' }
+                        ]
+                    },
+                    commander: {
+                        prompt: 'INCIDENT COMMANDER: Forensics confirm an insider altered Reinjection PLC logic via a USB drive. How do you restore safe operations and prevent recurrence?',
+                        options: [
+                            { text: 'A. Restore golden-image PLC logic under two-person verification, lock PLC key-switches to RUN, and revoke badge access.', correct: true, feedback: 'Comprehensive response combining physical controls, golden-baseline recovery, and HR/security coordination.' },
+                            { text: 'B. Leave the modified logic running until next year’s outage.', correct: false, feedback: 'Operating with compromised safety alarms is unacceptable.' },
+                            { text: 'C. Ban all operators from the control room.', correct: false, feedback: 'Operators are required to safely run the facility.' },
+                            { text: 'D. Remove passwords from engineering workstations for convenience.', correct: false, feedback: 'Weakening authentication increases insider risk.' }
+                        ]
+                    }
+                }
+            },
+            {
+                id: 'supply-chain',
+                shortName: 'Supply Chain',
+                title: 'ICS Vendor Supply Chain Compromise',
+                severity: 'Systemic Risk',
+                likelihood: 'low',
+                impact: 'high',
+                purduePath: [4, 3, 2, 1], // Update Server -> DMZ -> EWS -> PLC
+                affectedNodes: ['twin-turbine', 'twin-separator'],
+                nist: ['Identify (ID.SC-04)', 'Protect (PR.PS-05)', 'Detect (DE.CM-06)'],
+                iec: ['SR 3.4: Software & Info Integrity', 'SR 7.6: Secure Updates', 'ID.SC: Supply Chain Risk'],
+                mitre: {
+                    id: 'T0862',
+                    name: 'T0862: Supply Chain Compromise',
+                    tactic: 'Initial Access',
+                    impact: 'Dormant backdoor inside trusted turbine governor firmware update',
+                    summary: 'Adversaries compromise an ICS vendor’s software build pipeline, embedding a malicious DLL inside a signed turbine controller patch.',
+                    mitigations: 'Verify SHA-256 hashes out-of-band, inspect Software Bill of Materials (SBOM), and validate patches in an isolated digital twin before deployment.',
+                    detections: 'Detect unexpected outbound DNS/HTTPS C2 beacons from Level 2 engineering workstations after software updates.'
+                },
+                timeline: [
+                    { time: '14:00', event: 'Vendor Patch Imported to Level 3 Staging', detail: 'Turbine_Gov_Update_v4.2.exe downloaded from vendor portal.' },
+                    { time: '14:04', event: 'Patch Installed on Level 2 HMI/EWS', detail: 'Trojanized DLL loaded into turbine governor service.' },
+                    { time: '14:07', event: 'Outbound C2 Beacon Blocked at Firewall', detail: 'SCADA host attempts DNS tunneling to external IP.' },
+                    { time: '14:09', event: 'Governor Setpoint Drift Initiated', detail: 'Subtle harmonic oscillations introduced to turbine shaft.' },
+                    { time: '14:11', event: 'SOC Alert Triggered: [CRITICAL]', detail: 'Anomalous egress attempt from Level 2 OT zone detected.' }
+                ],
+                drills: {
+                    analyst: {
+                        prompt: 'ALERT: Level 2 SCADA server attempted an outbound HTTPS connection to an unknown external IP right after a turbine vendor software update. What do you do?',
+                        options: [
+                            { text: 'A. Block egress at the DMZ firewall, quarantine the update package, and alert ICS-CERT / vendor.', correct: true, feedback: 'Spot on! Level 2 OT assets should never initiate outbound internet connections; blocking egress and isolating the patch stops the supply-chain payload.' },
+                            { text: 'B. Open port 443 outbound so the update can finish downloading.', correct: false, feedback: 'Never allow direct internet egress from Level 2 SCADA systems.' },
+                            { text: 'C. Ignore the firewall block since the update was digitally signed.', correct: false, feedback: 'Supply chain attacks often abuse stolen vendor signing certificates.' },
+                            { text: 'D. Install the same patch on the backup SCADA server to test if it happens there too.', correct: false, feedback: 'Never propagate a suspected trojanized binary to redundant systems!' }
+                        ]
+                    },
+                    operator: {
+                        prompt: 'OPERATOR ALERT: Following a software update, turbine vibration sensors show abnormal harmonic oscillations at 3,600 RPM. What is your action?',
+                        options: [
+                            { text: 'A. Transfer turbine governor control to the redundant analog backup controller and stabilize load.', correct: true, feedback: 'Correct! Falling back to the unpatched redundant controller isolates the faulty firmware while keeping power online.' },
+                            { text: 'B. Increase turbine speed to 4,200 RPM to push past the vibration.', correct: false, feedback: 'Exceeding rated RPM can destroy the turbine rotor.' },
+                            { text: 'C. Disable the vibration sensor alarms.', correct: false, feedback: 'Masking mechanical vibration risks catastrophic turbine failure.' },
+                            { text: 'D. Close the steam separator drain valves.', correct: false, feedback: 'Trapping condensate in the steam line causes water hammer damage to turbine blades.' }
+                        ]
+                    },
+                    commander: {
+                        prompt: 'INCIDENT COMMANDER: A vendor update introduced a backdoor into our SCADA environment. How do you manage plant-wide recovery?',
+                        options: [
+                            { text: 'A. Roll back to pre-patch golden snapshots, audit all vendor binaries via SBOM, and coordinate with sector ISAC.', correct: true, feedback: 'Strong strategic response that restores clean baselines and protects peer energy facilities.' },
+                            { text: 'B. Reinstall the exact same update from the vendor website.', correct: false, feedback: 'The vendor repository itself may still be compromised.' },
+                            { text: 'C. Permanently disconnect all sensors.', correct: false, feedback: 'Unnecessary and makes plant operation impossible.' },
+                            { text: 'D. Keep the backdoor active to watch what the attackers do.', correct: false, feedback: 'Honeypotting inside a live 48 MW power plant violates safety first principles.' }
+                        ]
+                    }
+                }
+            },
+            {
+                id: 'ransomware-ot',
+                shortName: 'OT Ransomware',
+                title: 'Ransomware Targeting OT Networks',
+                severity: 'Operational Disruption',
+                likelihood: 'high',
+                impact: 'med',
+                purduePath: [5, 4, 3, 2], // IT Phishing -> Business -> DMZ -> HMI/Historian
+                affectedNodes: ['twin-wellA', 'twin-wellB', 'twin-wellC', 'twin-condenser'],
+                nist: ['Protect (PR.IR-01)', 'Detect (DE.CM-09)', 'Recover (RC.RP-01)'],
+                iec: ['SR 5.1: Network Segmentation', 'SR 7.3: Control System Backup', 'SR 7.4: Control System Recovery'],
+                mitre: {
+                    id: 'T0828',
+                    name: 'T0828: Loss of Productivity & Revenue',
+                    tactic: 'Impact',
+                    impact: 'HMI encryption & loss of operator visibility across geothermal wellfield',
+                    summary: 'Ransomware crosses weak IT/OT firewall boundaries via SMB/RDP, encrypting Level 2 operator HMIs and the process historian.',
+                    mitigations: 'Enforce strict Purdue Model DMZ segmentation, block SMB/RDP between IT and OT, and maintain immutable offline backups of HMIs and PLCs.',
+                    detections: 'Detect rapid file-rename entropy spikes, shadow copy deletion (vssadmin), and SMB lateral spread toward Level 3/2.'
+                },
+                timeline: [
+                    { time: '14:01', event: 'Phishing Payload Executed on Level 5 IT', detail: 'Corporate workstation compromised; credential dumping initiated.' },
+                    { time: '14:04', event: 'SMB Lateral Movement to Level 4 ERP', detail: 'Ransomware worm traverses flat internal subnet.' },
+                    { time: '14:06', event: 'Level 3 Historian Database Encrypted', detail: 'High file-I/O encryption burst detected on historian.' },
+                    { time: '14:08', event: 'Primary SCADA HMI Locked', detail: 'Operator screen displays ransom note; PLCs continue running.' },
+                    { time: '14:10', event: 'SOC Alert Triggered: [CRITICAL]', detail: 'Automated DMZ firewall isolation triggered.' }
+                ],
+                drills: {
+                    analyst: {
+                        prompt: 'ALERT: Ransomware is actively encrypting the Level 3 OT Historian and attempting SMB connections to Level 2 SCADA HMIs. What is your immediate move?',
+                        options: [
+                            { text: 'A. Sever the Level 3-to-Level 2 firewall conduit immediately to protect PLCs and backup HMIs.', correct: true, feedback: 'Spot on! Protecting Level 1/2 process control from encryption ensures the physical plant remains safely controllable while IT/Level 3 is recovered.' },
+                            { text: 'B. Run a full antivirus scan across all live PLCs.', correct: false, feedback: 'PLCs run proprietary firmware, not Windows AV, and scanning OT subnets can crash legacy RTUs.' },
+                            { text: 'C. Connect an external USB backup drive directly to the infected historian.', correct: false, feedback: 'The ransomware will immediately encrypt your backup drive!' },
+                            { text: 'D. Reboot all domain controllers first.', correct: false, feedback: 'Contain the IT/OT boundary first before domain recovery.' }
+                        ]
+                    },
+                    operator: {
+                        prompt: 'OPERATOR ALERT: Primary Windows HMI screen freezes with a ransomware note, but field PLCs are still running autonomously. What do you do?',
+                        options: [
+                            { text: 'A. Switch to the air-gapped backup HMI / local PLC panels; remember PLCs keep running safely without Windows HMIs.', correct: true, feedback: 'Crucial OT insight! Losing HMI visibility does not mean losing physical control—PLCs continue executing their deterministic loops.' },
+                            { text: 'B. Hit the emergency plant-wide SCRAM button immediately.', correct: false, feedback: 'An emergency SCRAM is unnecessary if PLCs are stable and backup local panels are operational.' },
+                            { text: 'C. Type the decryption key into the infected HMI.', correct: false, feedback: 'Never interact with ransom prompts on an active control terminal.' },
+                            { text: 'D. Unplug power to all wellhead RTUs.', correct: false, feedback: 'Cutting power to RTUs blinds safety interlocks.' }
+                        ]
+                    },
+                    commander: {
+                        prompt: 'INCIDENT COMMANDER: Level 4 IT and Level 3 Historian are encrypted, while Level 2/1 OT is isolated and stable. How do you guide recovery?',
+                        options: [
+                            { text: 'A. Keep OT air-gapped in manual/local operations, rebuild Level 3/2 from immutable offline backups, and engage incident forensics.', correct: true, feedback: 'Textbook OT resilience! Air-gapping preserves power generation while clean golden images restore full visibility.' },
+                            { text: 'B. Reconnect IT and OT networks so IT staff can remote into the HMIs.', correct: false, feedback: 'Reconnecting before full eradication will re-infect the OT environment.' },
+                            { text: 'C. Pay the attackers in cryptocurrency to unlock the historian.', correct: false, feedback: 'Decryption tools are unreliable and paying funds threat actors.' },
+                            { text: 'D. Shut down the geothermal plant for 30 days.', correct: false, feedback: 'Unnecessary downtime when isolated OT operations are safe.' }
+                        ]
+                    }
+                }
+            }
+        ];
+
+        // Purdue Model Levels Definition
+        const purdueLevels = [
+            { level: 5, name: 'Enterprise IT', desc: 'Corporate Email, Internet, ERP' },
+            { level: 4, name: 'Business Network', desc: 'Plant Scheduling, Vendor VPN' },
+            { level: 3, name: 'Operations DMZ', desc: 'Jump Hosts, Historian, Patch Server' },
+            { level: 2, name: 'SCADA / HMI', desc: 'Operator Consoles, Eng. Workstations' },
+            { level: 1, name: 'PLCs / RTUs', desc: 'Wellhead & Turbine Controllers' },
+            { level: 0, name: 'Sensors & Actuators', desc: 'Valves, Pressure & Temp Gauges' }
+        ];
+
+        // =========================================================================
+        // 2. APPLICATION STATE
+        // =========================================================================
+        let activeScenarioId = 'sensor-manipulation';
+        let isUnderAttack = false;
+        let timelineTimers = [];
+        let activePurdueStep = -1;
+        let currentDrillRole = 'analyst';
+        let userScoreXP = 0;
+        let completedDrills = new Set();
+
+        // Live drifting baseline metrics
+        let simMetrics = {
+            temp: 184.2,
+            pressure: 14.8,
+            rpm: 3600,
+            mw: 48.2
+        };
+
+        // =========================================================================
+        // 3. INITIALIZATION & TELEMETRY DRIFT ENGINE
+        // =========================================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            renderThreatCards();
+            renderHeatMap();
+            selectScenario('sensor-manipulation');
+            addSocLog('INFO', 'GeoShield ICS telemetry engine initialized. Monitoring 3 production wells.');
+            addSocLog('INFO', 'Purdue Model IT/OT boundary firewall active (14 rules loaded).');
+
+            // Start continuous 1.5s realistic telemetry drift loop
+            setInterval(updateLiveTelemetryDrift, 1500);
+        });
+
+        function updateLiveTelemetryDrift() {
+            const tempEl = document.getElementById('metric-temp');
+            const pressEl = document.getElementById('metric-pressure');
+            const rpmEl = document.getElementById('metric-rpm');
+            const mwEl = document.getElementById('metric-mw');
+
+            if (!isUnderAttack) {
+                // Realistic micro-fluctuations around nominal baseload
+                const dTemp = (Math.random() - 0.5) * 0.6;
+                const dPress = (Math.random() - 0.5) * 0.2;
+                const dRpm = Math.round((Math.random() - 0.5) * 6);
+                const dMw = (Math.random() - 0.5) * 0.3;
+
+                const t = (184.2 + dTemp).toFixed(1);
+                const p = (14.8 + dPress).toFixed(1);
+                const r = (3600 + dRpm).toLocaleString();
+                const m = (48.2 + dMw).toFixed(1);
+
+                tempEl.textContent = `${t} °C`;
+                pressEl.textContent = `${p} bar`;
+                rpmEl.textContent = `${r} RPM`;
+                mwEl.textContent = `${m} MW`;
+
+                // Update Digital Twin Well A live readout
+                const wellAVal = document.getElementById('twin-wellA-val');
+                if (wellAVal) wellAVal.textContent = `${t}°C | ${p}b`;
+            } else {
+                // Attack anomaly telemetry drift
+                if (activeScenarioId === 'sensor-manipulation') {
+                    const t = (248.5 + (Math.random() - 0.5) * 2.4).toFixed(1);
+                    const p = (29.4 + (Math.random() - 0.5) * 0.8).toFixed(1);
+                    const r = (4120 + Math.round((Math.random() - 0.5) * 25)).toLocaleString();
+                    tempEl.textContent = `${t} °C`;
+                    pressEl.textContent = `${p} bar`;
+                    rpmEl.textContent = `${r} RPM`;
+                    mwEl.textContent = `54.9 MW [SURGE]`;
+
+                    const wellAVal = document.getElementById('twin-wellA-val');
+                    if (wellAVal) wellAVal.textContent = `${t}°C | ${p}b`;
+                } else if (activeScenarioId === 'ransomware-ot') {
+                    tempEl.textContent = `HMI_LOCKED`;
+                    pressEl.textContent = `ERR_0x8004`;
+                    rpmEl.textContent = `3,600 RPM [LOCAL]`;
+                    mwEl.textContent = `48.1 MW [ISOLATED]`;
+                } else if (activeScenarioId === 'insider-threats') {
+                    tempEl.textContent = `189.4 °C [RISING]`;
+                    pressEl.textContent = `17.9 bar [HIGH]`;
+                    rpmEl.textContent = `3,604 RPM`;
+                    mwEl.textContent = `46.5 MW`;
+                } else {
+                    const t = (196.4 + (Math.random() - 0.5) * 1.5).toFixed(1);
+                    const p = (16.9 + (Math.random() - 0.5) * 0.4).toFixed(1);
+                    tempEl.textContent = `${t} °C`;
+                    pressEl.textContent = `${p} bar`;
+                    rpmEl.textContent = `3,685 RPM`;
+                    mwEl.textContent = `44.0 MW`;
+                }
+            }
+        }
+
+        // =========================================================================
+        // 4. SCENARIO SELECTION & UI SYNC
+        // =========================================================================
+        function selectScenario(id) {
+            resetPlantBaseline(false);
+            activeScenarioId = id;
+            const sc = threatScenarios.find(s => s.id === id);
+            if (!sc) return;
+
+            document.getElementById('selected-badge').textContent = sc.title;
+
+            // Update NIST & IEC Lists
+            const nistList = document.getElementById('nist-mapping-list');
+            nistList.innerHTML = sc.nist.map(item => `<li>&#10003; ${item}</li>`).join('');
+
+            const iecList = document.getElementById('iec-mapping-list');
+            iecList.innerHTML = sc.iec.map(item => `<li>&#10003; ${item}</li>`).join('');
+
+            // Update MITRE Card & Modal
+            document.getElementById('mitre-card-tech').textContent = sc.mitre.name;
+            document.getElementById('mitre-card-tactic').textContent = sc.mitre.tactic;
+            document.getElementById('mitre-card-summary').textContent = sc.mitre.summary;
+
+            document.getElementById('modal-mitre-title').textContent = sc.mitre.name;
+            document.getElementById('modal-mitre-tactic').textContent = sc.mitre.tactic;
+            document.getElementById('modal-mitre-impact').textContent = sc.mitre.impact;
+            document.getElementById('modal-mitre-mitigations').textContent = sc.mitre.mitigations;
+            document.getElementById('modal-mitre-detections').textContent = sc.mitre.detections;
+
+            // Render Timeline (idle state)
+            renderTimeline(sc, -1);
+
+            // Render Purdue Stack (idle state)
+            renderPurdueStack(sc.purduePath, -1);
+
+            // Highlight Heat Map
+            renderHeatMap();
+
+            // Re-render Threat Cards
+            renderThreatCards();
+
+            // Update Training Modal if open
+            renderTrainingDrill();
+        }
+
+        function renderThreatCards() {
+            const grid = document.getElementById('vector-grid');
+            grid.innerHTML = '';
+
+            threatScenarios.forEach(sc => {
+                const selected = sc.id === activeScenarioId;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => selectScenario(sc.id);
+                btn.className = `text-left p-2.5 rounded-lg border transition-all cursor-pointer flex flex-col justify-between ${
+                    selected
+                        ? 'bg-emerald-500/10 border-emerald-500 dark:border-emerald-400 ring-1 ring-emerald-500/40 shadow-sm'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                }`;
+
+                btn.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[10px] font-mono font-bold ${selected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}">
+                                ${sc.mitre.id}
+                            </span>
+                            <span class="w-1.5 h-1.5 rounded-full ${selected ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}"></span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-900 dark:text-white leading-snug">${sc.title}</div>
+                    </div>
+                    <div class="mt-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate">
+                        ${sc.severity}
+                    </div>
+                `;
+                grid.appendChild(btn);
+            });
+        }
+
+        function renderTimeline(sc, activeStepIndex) {
+            const container = document.getElementById('attack-timeline-list');
+            container.innerHTML = '';
+
+            sc.timeline.forEach((step, idx) => {
+                const isDone = idx <= activeStepIndex;
+                const isCurrent = idx === activeStepIndex;
+
+                const row = document.createElement('div');
+                row.className = `px-2.5 py-1.5 rounded-lg border text-[11px] transition-all duration-300 ${
+                    isCurrent
+                        ? 'bg-rose-500/15 border-rose-500 text-slate-900 dark:text-white shadow-sm'
+                        : isDone
+                            ? 'bg-amber-500/10 border-amber-500/30 text-slate-800 dark:text-slate-200'
+                            : 'bg-slate-50 dark:bg-slate-850/70 border-slate-200/70 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                }`;
+
+                row.innerHTML = `
+                    <div class="flex items-center justify-between font-mono">
+                        <span class="font-bold truncate pr-2 ${isCurrent ? 'text-rose-600 dark:text-rose-400' : isDone ? 'text-amber-600 dark:text-amber-400' : ''}">
+                            [${step.time}] ${step.event}
+                        </span>
+                        <span class="text-[9px] shrink-0">${isCurrent ? 'ACTIVE' : isDone ? 'LOGGED' : 'WAIT'}</span>
+                    </div>
+                    <p class="text-[10px] opacity-85 truncate">${step.detail}</p>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function renderPurdueStack(attackPath, currentHopIdx) {
+            const container = document.getElementById('purdue-stack');
+            container.innerHTML = '';
+
+            const compromisedLevels = currentHopIdx >= 0 ? attackPath.slice(0, currentHopIdx + 1) : [];
+            const activeLevel = currentHopIdx >= 0 ? attackPath[currentHopIdx] : -1;
+
+            purdueLevels.forEach((lvl, i) => {
+                const isTargetPath = attackPath.includes(lvl.level);
+                const isCompromised = compromisedLevels.includes(lvl.level);
+                const isCurrentHop = lvl.level === activeLevel;
+
+                const box = document.createElement('div');
+                box.className = `px-2.5 py-1.5 rounded-lg border transition-all duration-300 flex items-center justify-between ${
+                    isCurrentHop
+                        ? 'bg-rose-500/20 border-rose-500 shadow-sm'
+                        : isCompromised
+                            ? 'bg-amber-500/15 border-amber-500/50'
+                            : isTargetPath
+                                ? 'bg-slate-50 dark:bg-slate-850 border-slate-300 dark:border-slate-700'
+                                : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200/60 dark:border-slate-800/70 opacity-75'
+                }`;
+
+                box.innerHTML = `
+                    <div class="flex items-center space-x-2 min-w-0">
+                        <span class="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold shrink-0 ${
+                            isCurrentHop
+                                ? 'bg-rose-600 text-white'
+                                : isCompromised
+                                    ? 'bg-amber-500 text-slate-950'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        }">L${lvl.level}</span>
+                        <div class="truncate">
+                            <div class="text-[11px] font-bold text-slate-900 dark:text-white leading-tight truncate">${lvl.name}</div>
+                            <div class="text-[9px] text-slate-500 dark:text-slate-400 truncate">${lvl.desc}</div>
+                        </div>
+                    </div>
+                    <div class="font-mono text-[9px] font-bold shrink-0 ml-2">
+                        ${
+                            isCurrentHop
+                                ? '<span class="text-rose-500 animate-pulse">&#9888; BREACH</span>'
+                                : isCompromised
+                                    ? '<span class="text-amber-500">HOP</span>'
+                                    : isTargetPath
+                                        ? '<span class="text-slate-400">PATH</span>'
+                                        : '<span class="text-emerald-500/80">SAFE</span>'
+                        }
+                    </div>
+                `;
+                container.appendChild(box);
+            });
+        }
+
+        function startAttackSequence() {
+            resetPlantBaseline(false);
+            isUnderAttack = true;
+            const sc = threatScenarios.find(s => s.id === activeScenarioId);
+            if (!sc) return;
+
+            // Update Global Posture Pill
+            const pill = document.getElementById('global-posture-pill');
+            const dot = document.getElementById('global-posture-dot');
+            const text = document.getElementById('global-posture-text');
+            pill.className = 'hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-rose-500/15 border border-rose-500/40 text-rose-600 dark:text-rose-400 text-[11px] font-mono font-bold';
+            dot.className = 'w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping';
+            text.textContent = `ALERT: ${sc.shortName.toUpperCase()}`;
+
+            // Color metrics red/amber
+            document.getElementById('metric-temp').className = 'text-sm sm:text-base font-mono font-bold text-rose-500';
+            document.getElementById('metric-pressure').className = 'text-sm sm:text-base font-mono font-bold text-rose-500';
+            document.getElementById('metric-rpm').className = 'text-sm sm:text-base font-mono font-bold text-amber-500';
+
+            addSocLog('WARNING', `Initiating simulated adversary campaign: ${sc.title} (${sc.mitre.id})`);
+
+            // Step through timeline & Purdue hops
+            sc.timeline.forEach((step, idx) => {
+                const timer = setTimeout(() => {
+                    renderTimeline(sc, idx);
+                    const purdueHop = Math.min(idx, sc.purduePath.length - 1);
+                    renderPurdueStack(sc.purduePath, purdueHop);
+
+                    const level = idx === sc.timeline.length - 1 ? 'CRITICAL' : idx >= 2 ? 'WARNING' : 'INFO';
+                    addSocLog(level, `[${step.time}] ${step.event} — ${step.detail}`);
+
+                    // Escalate Digital Twin nodes progressively
+                    if (idx === 1) {
+                        setTwinNodeState(sc.affectedNodes[0], 'warning');
+                    } else if (idx >= 3) {
+                        sc.affectedNodes.forEach(nodeId => setTwinNodeState(nodeId, 'compromised'));
+                    }
+                }, idx * 1100);
+                timelineTimers.push(timer);
+            });
+        }
+
+        function resetPlantBaseline(logReset = true) {
+            timelineTimers.forEach(t => clearTimeout(t));
+            timelineTimers = [];
+            isUnderAttack = false;
+
+            const sc = threatScenarios.find(s => s.id === activeScenarioId);
+            if (sc) {
+                renderTimeline(sc, -1);
+                renderPurdueStack(sc.purduePath, -1);
+            }
+
+            // Reset Global Pill
+            const pill = document.getElementById('global-posture-pill');
+            const dot = document.getElementById('global-posture-dot');
+            const text = document.getElementById('global-posture-text');
+            pill.className = 'hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[11px] font-mono';
+            dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
+            text.textContent = 'PLANT POSTURE: NOMINAL';
+
+            // Reset Metric Colors
+            document.getElementById('metric-temp').className = 'text-sm sm:text-base font-mono font-bold text-cyan-600 dark:text-cyan-400';
+            document.getElementById('metric-pressure').className = 'text-sm sm:text-base font-mono font-bold text-cyan-600 dark:text-cyan-400';
+            document.getElementById('metric-rpm').className = 'text-sm sm:text-base font-mono font-bold text-emerald-600 dark:text-emerald-400';
+            document.getElementById('metric-mw').className = 'text-sm sm:text-base font-mono font-bold text-emerald-600 dark:text-emerald-400';
+
+            // Reset Digital Twin Nodes
+            ['twin-wellA', 'twin-wellB', 'twin-wellC', 'twin-separator', 'twin-turbine', 'twin-condenser', 'twin-injection'].forEach(id => {
+                setTwinNodeState(id, 'normal');
+            });
+
+            if (logReset) {
+                addSocLog('INFO', 'Plant baseline restored. All SCADA telemetry and PLC registers verified nominal.');
+            }
+        }
+
+        function setTwinNodeState(groupId, state) {
+            const group = document.getElementById(groupId);
+            if (!group) return;
+            const rect = group.querySelector('rect');
+            const circle = group.querySelector('circle');
+
+            group.classList.remove('node-compromised');
+
+            if (state === 'normal') {
+                rect.setAttribute('stroke', '#10b981');
+                circle.setAttribute('fill', '#10b981');
+            } else if (state === 'warning') {
+                rect.setAttribute('stroke', '#f59e0b');
+                circle.setAttribute('fill', '#f59e0b');
+            } else if (state === 'compromised') {
+                rect.setAttribute('stroke', '#f43f5e');
+                circle.setAttribute('fill', '#f43f5e');
+                group.classList.add('node-compromised');
+            }
+        }
+
+        // =========================================================================
+        // 6. SOC DETECTION ENGINE LOGS
+        // =========================================================================
+        function addSocLog(severity, message) {
+            const feed = document.getElementById('soc-log-feed');
+            const now = new Date();
+            const ts = now.toTimeString().split(' ')[0];
+
+            let badgeClass = 'text-cyan-400';
+            if (severity === 'WARNING') badgeClass = 'text-amber-400';
+            if (severity === 'CRITICAL') badgeClass = 'text-rose-400 font-bold';
+
+            const entry = document.createElement('div');
+            entry.className = 'leading-relaxed border-b border-slate-900 pb-1.5';
+            entry.innerHTML = `
+                <span class="text-slate-500">${ts}</span>
+                <span class="${badgeClass}">[${severity}]</span>
+                <span class="text-slate-300">${message}</span>
+            `;
+            feed.prepend(entry);
+        }
+
+        function clearSocLogs() {
+            document.getElementById('soc-log-feed').innerHTML = '';
+            addSocLog('INFO', 'SOC detection console cleared.');
+        }
+
+        // =========================================================================
+        // 8. THREAT SEVERITY HEAT MAP
+        // =========================================================================
+        function renderHeatMap() {
+            const cells = ['high-low', 'high-med', 'high-high', 'med-low', 'med-med', 'med-high', 'low-low', 'low-med', 'low-high'];
+            cells.forEach(c => {
+                const el = document.getElementById(`cell-${c}`);
+                if (el) el.innerHTML = '';
+            });
+
+            threatScenarios.forEach(sc => {
+                const cellId = `cell-${sc.impact}-${sc.likelihood}`;
+                const cell = document.getElementById(cellId);
+                if (!cell) return;
+
+                const isSelected = sc.id === activeScenarioId;
+                const tag = document.createElement('span');
+                tag.className = `px-1.5 py-0.5 rounded text-[9px] leading-tight break-words text-center max-w-full cursor-pointer transition-transform ${
+                    isSelected
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-extrabold scale-105 shadow'
+                        : 'bg-slate-900/60 text-slate-200 hover:bg-slate-900'
+                }`;
+                tag.textContent = sc.shortName;
+                tag.onclick = () => selectScenario(sc.id);
+                cell.appendChild(tag);
+            });
+        }
+
+        // =========================================================================
+        // 7 & 10. MODALS: MITRE EXPLORER & GAMIFIED TRAINING DRILL
+        // =========================================================================
+        function openMitreModal() {
+            const m = document.getElementById('mitre-modal');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+        }
+
+        function closeMitreModal() {
+            const m = document.getElementById('mitre-modal');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        function openTrainingModal() {
+            const m = document.getElementById('training-modal');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+            renderTrainingDrill();
+        }
+
+        function closeTrainingModal() {
+            const m = document.getElementById('training-modal');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        function selectTrainingRole(role) {
+            currentDrillRole = role;
+            renderTrainingDrill();
+        }
+
+        function renderTrainingDrill() {
+            const sc = threatScenarios.find(s => s.id === activeScenarioId);
+            if (!sc) return;
+
+            // Update Role Tabs Styling
+            ['analyst', 'operator', 'commander'].forEach(role => {
+                const btn = document.getElementById(`role-btn-${role}`);
+                if (role === currentDrillRole) {
+                    btn.className = 'py-2 px-3 rounded-xl text-xs font-bold bg-emerald-600 text-white border border-emerald-500 shadow-sm cursor-pointer';
+                } else {
+                    btn.className = 'py-2 px-3 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer';
+                }
+            });
+
+            const roleLabels = {
+                analyst: 'SOC Analyst Mode',
+                operator: 'Control Operator Mode',
+                commander: 'Incident Commander Mode'
+            };
+            document.getElementById('drill-role-tag').textContent = `Role: ${roleLabels[currentDrillRole]}`;
+
+            const drill = sc.drills[currentDrillRole];
+            document.getElementById('drill-prompt').textContent = drill.prompt;
+
+            const feedbackBox = document.getElementById('drill-feedback');
+            feedbackBox.classList.add('hidden');
+
+            const optionsContainer = document.getElementById('drill-options');
+            optionsContainer.innerHTML = '';
+
+            drill.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'w-full text-left p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-850 hover:border-emerald-500 dark:hover:border-emerald-400 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 transition-all cursor-pointer';
+                btn.textContent = opt.text;
+                btn.onclick = () => evaluateDrillAnswer(opt, btn);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function evaluateDrillAnswer(option, clickedBtn) {
+            const feedbackBox = document.getElementById('drill-feedback');
+            feedbackBox.classList.remove('hidden');
+
+            const drillKey = `${activeScenarioId}-${currentDrillRole}`;
+
+            if (option.correct) {
+                clickedBtn.className = 'w-full text-left p-3.5 rounded-xl border-2 border-emerald-500 bg-emerald-500/15 text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-300';
+                feedbackBox.className = 'p-4 rounded-xl text-xs sm:text-sm leading-relaxed border border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200';
+                feedbackBox.innerHTML = `<strong>&#10003; Optimal Response (+100 XP):</strong> ${option.feedback}`;
+
+                if (!completedDrills.has(drillKey)) {
+                    completedDrills.add(drillKey);
+                    userScoreXP += 100;
+                    document.getElementById('score-badge').textContent = `${userScoreXP} XP`;
+                    document.getElementById('modal-score-display').textContent = `${userScoreXP} XP`;
+                    addSocLog('INFO', `Training Drill passed (${drillKey}). Operator readiness +100 XP.`);
+                }
+            } else {
+                clickedBtn.className = 'w-full text-left p-3.5 rounded-xl border-2 border-rose-500 bg-rose-500/15 text-xs sm:text-sm font-bold text-rose-700 dark:text-rose-300';
+                feedbackBox.className = 'p-4 rounded-xl text-xs sm:text-sm leading-relaxed border border-rose-500/40 bg-rose-500/10 text-rose-800 dark:text-rose-200';
+                feedbackBox.innerHTML = `<strong>&#10007; Suboptimal Action:</strong> ${option.feedback}`;
+            }
+        }
+
+        // =========================================================================
+        // 11. THEME TOGGLE & MODERN CLIPBOARD API
+        // =========================================================================
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+        }
+
+        function copyMarkdown() {
+            const markdownText = `# GeoShield ICS — Geothermal Power Plant Cybersecurity Simulator
+
+An interactive geothermal power plant cybersecurity simulator that teaches industrial control system (ICS/OT) defense through realistic SCADA telemetry, Purdue Model segmentation, MITRE ATT&CK for ICS threat modeling, NIST-aligned controls, and animated incident response scenarios.
+
+## Core Capabilities
+- **Geothermal Plant Digital Twin:** Real-time process schematic tracking Production Wells A/B/C, Steam Separator, Turbine Generator, Condenser, and Reinjection Wells.
+- **Purdue Model Attack Path Visualization:** Interactive traversal mapping from Level 5 Enterprise IT down to Level 0 Physical Sensors & Actuators.
+- **Compliance & Threat Intelligence:** Dynamic mapping to **NIST CSF 2.0**, **IEC 62443**, and **MITRE ATT&CK for ICS** (T0831, T0822, T0859, T0862, T0828).
+- **OT SOC Detection Engine & Kill-Chain Timeline:** Animated step-by-step adversary progression with live drifting telemetry and IDS alerts.
+- **Role-Based Tabletop Training Mode:** Scored incident response drills across **SOC Analyst**, **Control Operator**, and **Incident Commander** perspectives.`;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(markdownText)
+                    .then(showToast)
+                    .catch(() => fallbackCopyText(markdownText));
+            } else {
+                fallbackCopyText(markdownText);
+            }
+        }
+
+        function fallbackCopyText(text) {
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            try {
+                document.execCommand('copy');
+                showToast();
+            } catch (err) {
+                console.error('Copy failed', err);
+            }
+            document.body.removeChild(temp);
+        }
+
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
